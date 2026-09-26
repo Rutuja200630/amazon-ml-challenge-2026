@@ -1,0 +1,52 @@
+============================================================
+AMAZON ML CHALLENGE 2026: BUSINESS ENTITY RESOLUTION
+COMPLETE METRICS REPORT (TRAIN, VALIDATION & TEST)
+============================================================
+
+[Validation Performance]
+  Validation Macro F0.5         : 0.9407646876901236
+  Validation Precision          : 0.9913619728990142
+  Validation Recall             : 0.8676670033184245
+  Validation Macro F1           : 0.9040051616213294
+  Candidate Recall              : 0.9527918049343529
+  Singleton Accuracy            : 0.9796672828096118
+  False Positives               : 262
+  False Negatives               : 4586
+
+[Model Configuration]
+  Selected Model                : XGBoost GPU (NVIDIA CUDA Accelerated hist)
+  Optimal S2 Threshold          : 0.7
+  Optimal S3 Threshold          : 0.75
+  Global Consistency            : Source-aware 1-to-1 target assignment (Greedy Highest-Probability)
+  Feature Set Size              : 36
+
+[Test Inference Results]
+  Total Source 1 Entities       : 1,732,544
+  Predicted Singletons          : 121,950 (7.04%)
+  Entities with Matches         : 1,610,594 (92.96%)
+  Total Predicted Matches       : 5,544,566
+  Total S2 Matches              : 2,739,473
+  Total S3 Matches              : 2,805,093
+  Total Candidate Pairs         : 34,461,015
+  Runtime                       : 6145.7s (102.43 min)
+
+[Country Breakdown]
+  France:
+    total_s1                 : 259452
+    singletons               : 14780
+    singleton_pct            : 5.696622111219031
+    matched_links            : 846325
+    avg_matches              : 3.2619713858440096
+  US:
+    total_s1                 : 663106
+    singletons               : 35143
+    singleton_pct            : 5.299755996778796
+    matched_links            : 2197925
+    avg_matches              : 3.314590729084038
+  India:
+    total_s1                 : 809986
+    singletons               : 72027
+    singleton_pct            : 8.892375917608453
+    matched_links            : 2500316
+    avg_matches              : 3.086863229734835
+

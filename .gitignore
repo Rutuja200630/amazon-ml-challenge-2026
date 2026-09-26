@@ -41,6 +41,7 @@ output/*.tsv
 
 # Output exceptions to keep
 !output/final_report.txt
+!output/metrics_summary.txt
 !output/.gitkeep
 
 # Scratch and logs

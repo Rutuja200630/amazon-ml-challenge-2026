@@ -2,23 +2,29 @@ import collections
 import normalization as norm
 
 COMMON_ADDR_WORDS = {
+    # English
     'street', 'road', 'avenue', 'boulevard', 'drive', 'court', 'lane', 'place',
     'circle', 'way', 'trail', 'parkway', 'highway', 'suite', 'floor', 'apartment',
     'building', 'room', 'number', 'near', 'opposite', 'behind', 'block', 'sector',
     'phase', 'plot', 'flat', 'door', 'fl', 'no', 'unit', 'north', 'south', 'east', 'west',
-    'india', 'us', 'usa', 'france', 'state', 'district', 'city', 'nagar', 'colony',
+    'india', 'us', 'usa', 'state', 'district', 'city', 'nagar', 'colony',
     'bazaar', 'marg', 'gali', 'null', 'rd', 'st', 'ave', 'blvd', 'dr', 'ct', 'ln',
-    'hwy', 'apt', 'ste', 'first', 'second', 'third', 'ground'
+    'hwy', 'apt', 'ste', 'first', 'second', 'third', 'ground',
+    # French
+    'france', 'rue', 'r', 'avenue', 'av', 'boulevard', 'bd', 'chemin', 'ch',
+    'impasse', 'imp', 'allee', 'all', 'route', 'rte', 'cours', 'crs', 'quai', 'qu',
+    'place', 'pl', 'square', 'sq', 'voie', 'passage', 'pass', 'cedex', 'bp',
+    'boite', 'postale', 'etage', 'batiment', 'bat', 'immeuble', 'residence',
+    'res', 'lieu', 'dit', 'lieudit', 'bis', 'ter', 'quater', 'zone', 'industrielle',
+    'zi', 'za', 'activite', 'de', 'du', 'des', 'la', 'le', 'les', 'en', 'au', 'aux',
+    'sur', 'sous', 'saint', 'sainte', 'd', 'l'
 }
 
 
-def get_blocking_keys(name, addr, country):
+def get_blocking_keys_from_preprocessed(c_n, core_n, c_a, nums):
     """
-    Generates multi-attribute blocking keys from business name and address.
+    Generates blocking keys from pre-normalized fields without redundant string parsing.
     """
-    c_n, core_n, sort_n = norm.normalize_name(name)
-    c_a, nums, sort_a = norm.normalize_address(addr)
-
     keys = set()
     n_tokens = core_n.split()
     a_tokens = c_a.split()
@@ -40,9 +46,9 @@ def get_blocking_keys(name, addr, country):
     elif len(n_tokens) == 1 and len(n_tokens[0]) >= 3:
         keys.add(('n1', n_tokens[0]))
 
-    # 4. Individual name tokens
+    # 4. Individual significant name tokens
     for t in n_tokens:
-        if len(t) >= 4:
+        if len(t) >= 4 and t not in norm.LEGAL_SUFFIXES and t not in norm.ARTICLES_AND_PREP:
             keys.add(('n_tok', t))
 
     # Address tokens: extract significant words
@@ -85,7 +91,13 @@ def get_blocking_keys(name, addr, country):
     return keys
 
 
-def build_inverted_index_for_country(target_records, name_prune=300, addr_prune=150):
+def get_blocking_keys(name, addr, country=None):
+    """
+    Generates multi-attribute blocking keys from business name and address strings.
+    """
+    c_n, core_n, _ = norm.normalize_name(name)
+    c_a, nums, _, _ = norm.normalize_address(addr)
+    return get_blocking_keys_from_preprocessed(c_n, core_n, c_a, nums)
     """
     target_records: dict of tid -> (name, addr, country)
     Returns: inverted index dict: key -> list of tids
@@ -105,15 +117,21 @@ def build_inverted_index_for_country(target_records, name_prune=300, addr_prune=
     return index
 
 
-def retrieve_candidates_for_s1(rname, raddr, rcountry, inverted_index, top_k=20):
+def retrieve_candidates_for_s1(s1_records, inverted_index, top_k=20):
     """
-    Given an S1 record and the country inverted index, returns [(tid, shared_key_count), ...]
+    s1_records: dict of sid -> (name, addr, country)
+    inverted_index: dict of key -> list of tids
+    Returns: dict of sid -> list of (tid, shared_count)
     """
-    s_keys = get_blocking_keys(rname, raddr, rcountry)
-    counts = collections.Counter()
-    for k in s_keys:
-        if k in inverted_index:
-            counts.update(inverted_index[k])
-    if counts:
-        return counts.most_common(top_k)
-    return []
+    results = {}
+    for sid, (rname, raddr, rcountry) in s1_records.items():
+        skeys = get_blocking_keys(rname, raddr, rcountry)
+        counts = collections.Counter()
+        for k in skeys:
+            if k in inverted_index:
+                counts.update(inverted_index[k])
+        if counts:
+            results[sid] = counts.most_common(top_k)
+        else:
+            results[sid] = []
+    return results
