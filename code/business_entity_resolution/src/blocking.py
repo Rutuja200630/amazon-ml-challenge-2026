@@ -129,23 +129,7 @@ def get_blocking_keys(name, addr, country=None):
     c_n, core_n, _ = norm.normalize_name(name)
     c_a, nums, _, _ = norm.normalize_address(addr)
     return get_blocking_keys_from_preprocessed(c_n, core_n, c_a, nums)
-    """
-    target_records: dict of tid -> (name, addr, country)
-    Returns: inverted index dict: key -> list of tids
-    """
-    index = collections.defaultdict(list)
-    for tid, (rname, raddr, rcountry) in target_records.items():
-        keys = get_blocking_keys(rname, raddr, rcountry)
-        for k in keys:
-            index[k].append(tid)
 
-    # Prune ultra-frequent keys
-    for k in list(index.keys()):
-        limit = name_prune if (k[0].startswith('n') or k[0].startswith('core') or k[0].startswith('compact')) else addr_prune
-        if len(index[k]) > limit:
-            del index[k]
-
-    return index
 
 
 def retrieve_candidates_for_s1(s1_records, inverted_index, top_k=50):
