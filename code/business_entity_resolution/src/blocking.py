@@ -51,11 +51,13 @@ def get_blocking_keys_from_preprocessed(c_n, core_n, c_a, nums):
         if len(t) >= 3 and t not in norm.LEGAL_SUFFIXES and t not in norm.ARTICLES_AND_PREP:
             keys.add(('n_tok', t))
 
-    # 4b. Prefix n-grams (3, 4, 5-gram) for core name
+    # 4b. Prefix n-grams (3, 4, 5-gram) and sliding 3-grams for core name
     if len(core_n) >= 3:
         keys.add(('gram3', core_n[:3]))
     if len(core_n) >= 4:
         keys.add(('gram4', core_n[:4]))
+        for i in range(len(core_n) - 2):
+            keys.add(('gram3_w', core_n[i:i+3]))
     if len(core_n) >= 5:
         keys.add(('gram5', core_n[:5]))
 
