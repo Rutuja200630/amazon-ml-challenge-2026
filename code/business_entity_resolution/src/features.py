@@ -12,6 +12,8 @@ FEATURE_NAMES = [
     'name_jw_sim',
     'name_token_sort',
     'name_token_set',
+    'name_token_ratio',
+    'name_partial',
     'name_token_jaccard',
     'name_token_overlap',
     'name_len_diff',
@@ -26,6 +28,7 @@ FEATURE_NAMES = [
     'addr_jw_sim',
     'addr_token_sort',
     'addr_token_set',
+    'addr_partial',
     'addr_token_jaccard',
     'num_common_count',
     'num_has_match',
@@ -68,6 +71,8 @@ def extract_features_for_pair(s1_tuple, target_tuple, target_id, shared_keys=1):
     n_jw = JaroWinkler.similarity(s1_name, t_name) if s1_name and t_name else 0.0
     n_sort = fuzz.token_sort_ratio(s1_name, t_name) / 100.0 if s1_name and t_name else 0.0
     n_set = fuzz.token_set_ratio(s1_name, t_name) / 100.0 if s1_name and t_name else 0.0
+    n_ratio = fuzz.token_ratio(s1_name, t_name) / 100.0 if s1_name and t_name else 0.0
+    n_partial = fuzz.partial_ratio(s1_name, t_name) / 100.0 if s1_name and t_name else 0.0
 
     s1_toks = s1_core.split()
     t_toks = t_core.split()
@@ -113,6 +118,7 @@ def extract_features_for_pair(s1_tuple, target_tuple, target_id, shared_keys=1):
         a_jw = JaroWinkler.similarity(s1_addr, t_addr)
         a_sort = fuzz.token_sort_ratio(s1_addr, t_addr) / 100.0
         a_set = fuzz.token_set_ratio(s1_addr, t_addr) / 100.0
+        a_partial = fuzz.partial_ratio(s1_addr, t_addr) / 100.0
 
         s1_a_toks = set(s1_addr.split())
         t_a_toks = set(t_addr.split())
@@ -142,6 +148,7 @@ def extract_features_for_pair(s1_tuple, target_tuple, target_id, shared_keys=1):
         a_jw = 0.0
         a_sort = 0.0
         a_set = 0.0
+        a_partial = 0.0
         a_jaccard = 0.0
         shared_nums = 0
         has_num_match = 0.0
@@ -171,6 +178,8 @@ def extract_features_for_pair(s1_tuple, target_tuple, target_id, shared_keys=1):
         n_jw,
         n_sort,
         n_set,
+        n_ratio,
+        n_partial,
         n_jaccard,
         n_overlap,
         n_len_diff,
@@ -185,6 +194,7 @@ def extract_features_for_pair(s1_tuple, target_tuple, target_id, shared_keys=1):
         a_jw,
         a_sort,
         a_set,
+        a_partial,
         a_jaccard,
         float(shared_nums),
         has_num_match,

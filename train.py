@@ -209,43 +209,54 @@ def main():
         return []
 
     # 5. Build Training Feature Matrix with Active Hard Negative Mining
-    print('Extracting features for training pairs (including hard negatives)...')
+    print(f'Extracting features for training pairs using multi-core CPU ({os.cpu_count() or 4} workers)...')
     t_feat_start = time.time()
-    X_train = []
-    y_train = []
     train_target_set = set(target_preprocessed.keys())
 
-    for sid in train_s1_ids:
+    import concurrent.futures
+
+    def process_s1_train_entity(sid):
         true_mids = train_gt.get(sid, set()) & train_target_set
         cands = get_candidates(sid, top_k=args.top_k)
         cand_mids = {tid: count for tid, count in cands}
-
         s1_tup = s1_preprocessed[sid][:5]
+        local_X = []
+        local_y = []
+
         for mid in true_mids:
             if mid in target_preprocessed:
                 t_tup = target_preprocessed[mid][:5]
                 sh = cand_mids.get(mid, 1)
                 feats = extract_features_for_pair(s1_tup, t_tup, mid, sh)
-                X_train.append(feats)
-                y_train.append(1)
+                local_X.append(feats)
+                local_y.append(1)
 
-        # Mine hard negatives:
-        # Candidates that share keys with S1 but are NOT true matches
-        # cands is ordered by shared key count (sh) descending (most similar hard negatives first)
         neg_count = 0
         max_negs = max(10, len(true_mids) * 10)
         for tid, sh in cands:
             if tid not in true_mids and tid in target_preprocessed:
                 t_tup = target_preprocessed[tid][:5]
                 feats = extract_features_for_pair(s1_tup, t_tup, tid, sh)
-                X_train.append(feats)
-                y_train.append(0)
+                local_X.append(feats)
+                local_y.append(0)
                 neg_count += 1
                 if neg_count >= max_negs:
                     break
+        return local_X, local_y
 
-    X_train = np.array(X_train, dtype=np.float32)
-    y_train = np.array(y_train, dtype=np.int32)
+    num_workers = min(16, max(2, (os.cpu_count() or 4)))
+    X_train_list = []
+    y_train_list = []
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
+        futures = executor.map(process_s1_train_entity, train_s1_ids, chunksize=500)
+        for res_X, res_y in futures:
+            if res_X:
+                X_train_list.extend(res_X)
+                y_train_list.extend(res_y)
+
+    X_train = np.array(X_train_list, dtype=np.float32)
+    y_train = np.array(y_train_list, dtype=np.int32)
     pos_count = int(np.sum(y_train))
     neg_count = len(y_train) - pos_count
     print(f'Training dataset: X_train shape = {X_train.shape} (Positives = {pos_count:,}, Negatives = {neg_count:,}) in {time.time()-t_feat_start:.1f}s.')
@@ -270,32 +281,33 @@ def main():
     retrieved_val_true = 0
     total_val_true = sum(len(v) for v in val_gt.values())
 
-    for sid in val_s1_ids:
+    def process_s1_val_entity(sid):
         cands = get_candidates(sid, top_k=args.top_k)
         cand_ids = [tid for tid, _ in cands]
-        retrieved_val_true += len(val_gt[sid] & set(cand_ids))
+        retrieved_count = len(val_gt[sid] & set(cand_ids))
 
+        local_pairs = []
         s1_tup = s1_preprocessed[sid][:5]
         for tid, sh in cands:
             if tid in target_preprocessed:
                 t_tup = target_preprocessed[tid][:5]
                 feats = extract_features_for_pair(s1_tup, t_tup, tid, sh)
-                val_pair_list.append((sid, tid, feats, s1_tup, t_tup))
+                local_pairs.append((sid, tid, feats, s1_tup, t_tup))
+        return retrieved_count, local_pairs
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
+        val_results = executor.map(process_s1_val_entity, val_s1_ids, chunksize=200)
+        for r_count, l_pairs in val_results:
+            retrieved_val_true += r_count
+            if l_pairs:
+                val_pair_list.extend(l_pairs)
 
     X_val = np.array([p[2] for p in val_pair_list], dtype=np.float32)
     val_probas = final_model.predict_proba(X_val)
 
     scores_dict = collections.defaultdict(list)
     for (sid, tid, feats, s1_tup, t_tup), p in zip(val_pair_list, val_probas):
-        prob = float(p)
-        # Apply set-based street number conflict penalty (softened for higher recall)
-        s1_nums = s1_tup[3]
-        t_nums = t_tup[3]
-        if s1_nums and t_nums and len(set(s1_nums) & set(t_nums)) == 0:
-            exact_core = feats[1]
-            if exact_core < 1.0:
-                prob *= 0.80
-        scores_dict[sid].append((tid, prob))
+        scores_dict[sid].append((tid, float(p)))
 
     for sid in val_s1_ids:
         if sid not in scores_dict:

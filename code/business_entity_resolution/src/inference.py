@@ -14,7 +14,7 @@ from blocking import get_blocking_keys_from_preprocessed
 from thresholding import apply_threshold_and_deduplication
 
 
-def run_test_inference(test_dir, model_path, meta_path, output_dir, batch_size=10000, top_k=100):
+def run_test_inference(test_dir, model_path, meta_path, output_dir, batch_size=10000, top_k=200):
     """
     Runs end-to-end entity resolution inference on the complete test dataset.
     Uses disk-backed SQLite caching on D: drive to guarantee zero memory bloat (<500MB RAM),
@@ -137,7 +137,7 @@ def run_test_inference(test_dir, model_path, meta_path, output_dir, batch_size=1
         # Prune high-frequency keys to prevent generic word explosion
         pruned = 0
         for k in list(index.keys()):
-            limit = 1500 if (k[0].startswith('n') or k[0].startswith('core') or k[0].startswith('compact') or k[0].startswith('gram')) else 800
+            limit = 4000 if (k[0].startswith('n') or k[0].startswith('core') or k[0].startswith('compact') or k[0].startswith('gram') or k[0].startswith('snd')) else 1800
             if len(index[k]) > limit:
                 del index[k]
                 pruned += 1
@@ -190,20 +190,12 @@ def run_test_inference(test_dir, model_path, meta_path, output_dir, batch_size=1
             # Stream candidates directly to SQLite DB on D: drive
             cursor.executemany('INSERT INTO candidates VALUES (?, ?)', cand_rows)
 
-            # Predict batch on CUDA GPU with number-consistency logic
+            # Predict batch on CUDA GPU
             if batch_pairs:
                 X_batch = np.array([p[2] for p in batch_pairs], dtype=np.float32)
                 probas = model.predict_proba(X_batch)
                 for (eid, tid, feats, s1_tup, t_tup), p in zip(batch_pairs, probas):
-                    prob = float(p)
-                    # Set-based street number conflict check:
-                    s1_nums = s1_tup[3]
-                    t_nums = t_tup[3]
-                    if s1_nums and t_nums and len(set(s1_nums) & set(t_nums)) == 0:
-                        exact_core = feats[1]
-                        if exact_core < 1.0:
-                            prob *= 0.80
-                    c_scores_dict[eid].append((tid, prob))
+                    c_scores_dict[eid].append((tid, float(p)))
 
             if (b_idx + 1) % 10 == 0 or (b_idx + 1) == n_batches:
                 print(f'    Processed batch {b_idx + 1}/{n_batches} ({b_end:,}/{len(s1_list):,} records)...')
