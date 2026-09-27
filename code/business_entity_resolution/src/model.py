@@ -25,8 +25,17 @@ class EntityMatcherModel:
                 'eval_metric': 'logloss'
             }
             default_params.update(self.params)
-            self.model = xgb.XGBClassifier(**default_params)
-            self.model.fit(X, y, sample_weight=sample_weight)
+            try:
+                self.model = xgb.XGBClassifier(**default_params)
+                self.model.fit(X, y, sample_weight=sample_weight)
+            except Exception as e:
+                if device == 'cuda':
+                    print(f'CUDA acceleration unavailable ({e}), falling back to CPU hist mode...')
+                    default_params['device'] = 'cpu'
+                    self.model = xgb.XGBClassifier(**default_params)
+                    self.model.fit(X, y, sample_weight=sample_weight)
+                else:
+                    raise e
         elif self.model_type == 'lightgbm':
             import lightgbm as lgb
             default_params = {
@@ -55,9 +64,14 @@ class EntityMatcherModel:
         if hasattr(self.model, 'get_booster'):
             import xgboost as xgb
             b = self.model.get_booster()
-            b.set_param({'device': 'cuda'})
-            dmat = xgb.DMatrix(X)
-            return b.predict(dmat)
+            try:
+                b.set_param({'device': 'cuda'})
+                dmat = xgb.DMatrix(X)
+                return b.predict(dmat)
+            except Exception:
+                b.set_param({'device': 'cpu'})
+                dmat = xgb.DMatrix(X)
+                return b.predict(dmat)
         return self.model.predict_proba(X)[:, 1]
 
     def save(self, filepath):

@@ -35,8 +35,12 @@ def main():
                         help='Path to file containing held-out validation Source 1 IDs')
     parser.add_argument('--n-val', type=int, default=10000,
                         help='Number of validation Source 1 entities to evaluate')
-    parser.add_argument('--n-train', type=int, default=60000,
+    parser.add_argument('--n-train', type=int, default=150000,
                         help='Number of training Source 1 entities to sample')
+    parser.add_argument('--top-k', type=int, default=50,
+                        help='Number of candidates per S1 entity')
+    parser.add_argument('--seed', type=int, default=42,
+                        help='Random seed for reproducible training sampling')
     parser.add_argument('--n-distractors', type=int, default=300000,
                         help='Number of realistic background distractors to load from target sources')
     parser.add_argument('--model-type', default='xgboost_gpu', choices=['xgboost_gpu', 'xgboost', 'lightgbm'],
@@ -88,16 +92,21 @@ def main():
                 val_true_targets.update(mids)
 
     # 2. Select Training S1 records (strictly disjoint from validation)
-    train_s1_ids = []
+    all_train_s1_ids = []
     with open(gt_file, 'r', encoding='utf-8') as f:
         f.readline()
         for line in f:
             p = line.rstrip('\r\n').split('\t')
             sid = p[0]
             if sid not in val_s1_set:
-                train_s1_ids.append(sid)
-                if len(train_s1_ids) >= args.n_train:
-                    break
+                all_train_s1_ids.append(sid)
+
+    rng = np.random.RandomState(args.seed)
+    if len(all_train_s1_ids) > args.n_train:
+        indices = rng.choice(len(all_train_s1_ids), size=args.n_train, replace=False)
+        train_s1_ids = [all_train_s1_ids[i] for i in indices]
+    else:
+        train_s1_ids = all_train_s1_ids
 
     train_s1_set = set(train_s1_ids)
     train_gt = {}
@@ -181,7 +190,7 @@ def main():
             if len(indices[c][k]) > limit:
                 del indices[c][k]
 
-    def get_candidates(sid, top_k=20):
+    def get_candidates(sid, top_k=50):
         s_keys = s1_blocking_keys[sid]
         country = s1_preprocessed[sid][5]
         c_index = indices[country]
@@ -202,7 +211,7 @@ def main():
 
     for sid in train_s1_ids:
         true_mids = train_gt.get(sid, set()) & train_target_set
-        cands = get_candidates(sid, top_k=20)
+        cands = get_candidates(sid, top_k=args.top_k)
         cand_mids = {tid: count for tid, count in cands}
 
         s1_tup = s1_preprocessed[sid][:5]
@@ -215,8 +224,10 @@ def main():
                 y_train.append(1)
 
         # Mine hard negatives:
-        # 1. Candidates that share keys with S1 but are NOT true matches
+        # Candidates that share keys with S1 but are NOT true matches
+        # cands is ordered by shared key count (sh) descending (most similar hard negatives first)
         neg_count = 0
+        max_negs = max(6, len(true_mids) * 6)
         for tid, sh in cands:
             if tid not in true_mids and tid in target_preprocessed:
                 t_tup = target_preprocessed[tid][:5]
@@ -224,7 +235,7 @@ def main():
                 X_train.append(feats)
                 y_train.append(0)
                 neg_count += 1
-                if neg_count >= max(3, len(true_mids) * 3):
+                if neg_count >= max_negs:
                     break
 
     X_train = np.array(X_train, dtype=np.float32)
@@ -254,7 +265,7 @@ def main():
     total_val_true = sum(len(v) for v in val_gt.values())
 
     for sid in val_s1_ids:
-        cands = get_candidates(sid, top_k=20)
+        cands = get_candidates(sid, top_k=args.top_k)
         cand_ids = [tid for tid, _ in cands]
         retrieved_val_true += len(val_gt[sid] & set(cand_ids))
 
@@ -340,7 +351,9 @@ def main():
         'train_samples': len(train_s1_ids),
         'train_positives': pos_count,
         'train_negatives': neg_count,
-        'val_samples': len(val_s1_ids)
+        'val_samples': len(val_s1_ids),
+        'top_k': args.top_k,
+        'seed': args.seed
     }
     with open(args.meta_out, 'w', encoding='utf-8') as f:
         json.dump(meta, f, indent=2)

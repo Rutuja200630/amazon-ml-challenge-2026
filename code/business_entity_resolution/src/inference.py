@@ -14,7 +14,7 @@ from blocking import get_blocking_keys_from_preprocessed
 from thresholding import apply_threshold_and_deduplication
 
 
-def run_test_inference(test_dir, model_path, meta_path, output_dir, batch_size=10000, top_k=20):
+def run_test_inference(test_dir, model_path, meta_path, output_dir, batch_size=10000, top_k=50):
     """
     Runs end-to-end entity resolution inference on the complete test dataset.
     Uses disk-backed SQLite caching on D: drive to guarantee zero memory bloat (<500MB RAM),

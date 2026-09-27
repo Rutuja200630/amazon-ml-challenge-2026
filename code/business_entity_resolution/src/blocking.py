@@ -117,7 +117,7 @@ def get_blocking_keys(name, addr, country=None):
     return index
 
 
-def retrieve_candidates_for_s1(s1_records, inverted_index, top_k=20):
+def retrieve_candidates_for_s1(s1_records, inverted_index, top_k=50):
     """
     s1_records: dict of sid -> (name, addr, country)
     inverted_index: dict of key -> list of tids
