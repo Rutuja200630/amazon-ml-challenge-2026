@@ -67,12 +67,20 @@ def extract_features_for_pair(s1_tuple, target_tuple, target_id, shared_keys=1):
     exact_clean = 1.0 if s1_name == t_name and s1_name else 0.0
     exact_core = 1.0 if s1_core == t_core and s1_core else 0.0
 
-    n_lev = Levenshtein.normalized_similarity(s1_name, t_name) if s1_name and t_name else 0.0
-    n_jw = JaroWinkler.similarity(s1_name, t_name) if s1_name and t_name else 0.0
-    n_sort = fuzz.token_sort_ratio(s1_name, t_name) / 100.0 if s1_name and t_name else 0.0
-    n_set = fuzz.token_set_ratio(s1_name, t_name) / 100.0 if s1_name and t_name else 0.0
-    n_ratio = fuzz.token_ratio(s1_name, t_name) / 100.0 if s1_name and t_name else 0.0
-    n_partial = fuzz.partial_ratio(s1_name, t_name) / 100.0 if s1_name and t_name else 0.0
+    if s1_name == t_name and s1_name:
+        n_lev = 1.0
+        n_jw = 1.0
+        n_sort = 1.0
+        n_set = 1.0
+        n_ratio = 1.0
+        n_partial = 1.0
+    else:
+        n_lev = Levenshtein.normalized_similarity(s1_name, t_name) if s1_name and t_name else 0.0
+        n_jw = JaroWinkler.similarity(s1_name, t_name) if s1_name and t_name else 0.0
+        n_sort = fuzz.token_sort_ratio(s1_name, t_name) / 100.0 if s1_name and t_name else 0.0
+        n_set = fuzz.token_set_ratio(s1_name, t_name) / 100.0 if s1_name and t_name else 0.0
+        n_ratio = fuzz.token_ratio(s1_name, t_name) / 100.0 if s1_name and t_name else 0.0
+        n_partial = fuzz.partial_ratio(s1_name, t_name) / 100.0 if s1_name and t_name else 0.0
 
     s1_toks = s1_core.split()
     t_toks = t_core.split()
@@ -114,11 +122,14 @@ def extract_features_for_pair(s1_tuple, target_tuple, target_id, shared_keys=1):
 
     if has_addr and s1_addr:
         a_exact = 1.0 if s1_addr == t_addr else 0.0
-        a_lev = Levenshtein.normalized_similarity(s1_addr, t_addr)
-        a_jw = JaroWinkler.similarity(s1_addr, t_addr)
-        a_sort = fuzz.token_sort_ratio(s1_addr, t_addr) / 100.0
-        a_set = fuzz.token_set_ratio(s1_addr, t_addr) / 100.0
-        a_partial = fuzz.partial_ratio(s1_addr, t_addr) / 100.0
+        if a_exact == 1.0:
+            a_lev, a_jw, a_sort, a_set, a_partial = 1.0, 1.0, 1.0, 1.0, 1.0
+        else:
+            a_lev = Levenshtein.normalized_similarity(s1_addr, t_addr)
+            a_jw = JaroWinkler.similarity(s1_addr, t_addr)
+            a_sort = fuzz.token_sort_ratio(s1_addr, t_addr) / 100.0
+            a_set = fuzz.token_set_ratio(s1_addr, t_addr) / 100.0
+            a_partial = fuzz.partial_ratio(s1_addr, t_addr) / 100.0
 
         s1_a_toks = set(s1_addr.split())
         t_a_toks = set(t_addr.split())
