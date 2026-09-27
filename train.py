@@ -235,7 +235,7 @@ def main():
                 y_train_list.append(1)
 
         neg_count = 0
-        max_negs = max(10, len(true_mids) * 10)
+        max_negs = max(6, len(true_mids) * 6)
         for tid, sh in cands:
             if tid not in true_mids and tid in target_preprocessed:
                 t_tup = target_preprocessed[tid][:5]
@@ -296,93 +296,31 @@ def main():
             scores_dict[sid] = []
 
     # Grid search optimal thresholds with bipartite 1-to-1 consistency
+    # Pre-sort all candidate pairs ONCE by probability (descending) with floor filter.
+    # Each grid iteration then does a single O(N) scan with early break — fast & correct.
     print(f'Optimizing source-specific thresholds for target metric: {args.target_metric} with 1-to-1 deduplication...')
-
-    # Build compact arrays for fast vectorized threshold search
-    # For each sid, collect all (tid, prob, is_s2) sorted by prob desc
-    sid_to_idx = {sid: i for i, sid in enumerate(val_s1_ids)}
-    n_val = len(val_s1_ids)
-    val_true_sizes = np.array([len(val_gt[sid]) for sid in val_s1_ids], dtype=np.int32)
-
-    # All pairs above floor prob
-    all_pairs = []  # (prob, sid_idx, tid, is_s2)
+    pre_sorted_pairs = []
     for sid, score_list in scores_dict.items():
-        si = sid_to_idx.get(sid, -1)
-        if si < 0:
-            continue
-        gt = val_gt.get(sid, set())
         for tid, p in score_list:
             if p >= 0.15:
-                is_s2 = tid.startswith('S2-')
-                is_tp = tid in gt
-                all_pairs.append((p, si, is_s2, is_tp))
-
-    if not all_pairs:
-        best_s2, best_s3 = 0.5, 0.5
-    else:
-        # Sort desc by prob (done once)
-        all_pairs.sort(key=lambda x: x[0], reverse=True)
-        probs_arr = np.array([x[0] for x in all_pairs], dtype=np.float32)
-        sidx_arr  = np.array([x[1] for x in all_pairs], dtype=np.int32)
-        is_s2_arr = np.array([x[2] for x in all_pairs], dtype=bool)
-        is_tp_arr = np.array([x[3] for x in all_pairs], dtype=bool)
-
-        s2_grid = np.linspace(0.25, 0.85, 61, dtype=np.float32)
-        s3_grid = np.linspace(0.25, 0.85, 61, dtype=np.float32)
-
-        best_score = -1.0
-        best_s2 = 0.50
-        best_s3 = 0.50
-
-        for t2 in s2_grid:
-            for t3 in s3_grid:
-                # Determine per-pair threshold based on source
-                thresh = np.where(is_s2_arr, t2, t3)
-                above  = probs_arr >= thresh
-
-                # Greedy 1-to-1 dedup: take highest prob first (already sorted)
-                assigned_sid = np.full(n_val, 0, dtype=np.int32)  # TP count per sid
-                fp_per_sid   = np.zeros(n_val, dtype=np.int32)
-                seen_tids    = {}
-
-                for i in range(len(all_pairs)):
-                    if not above[i]:
-                        continue
-                    tid = all_pairs[i][1]  # sid_idx
-                    # Use index i as proxy for tid uniqueness — track real tid
-                    pass
-
-                # Fast path: skip full dedup, approximate with per-sid counts
-                # TP = above & is_tp,  FP = above & ~is_tp, per sid
-                tp_per_sid = np.zeros(n_val, dtype=np.int32)
-                fp_per_sid = np.zeros(n_val, dtype=np.int32)
-                np.add.at(tp_per_sid, sidx_arr[above & is_tp_arr], 1)
-                np.add.at(fp_per_sid, sidx_arr[above & ~is_tp_arr], 1)
-
-                pred_sizes = tp_per_sid + fp_per_sid  # predicted positives per sid
-
-                # Per-entity F2 (handles singletons: true_size=0, pred_size=0 -> 1.0)
-                with np.errstate(divide='ignore', invalid='ignore'):
-                    prec = np.where(pred_sizes > 0, tp_per_sid / pred_sizes, 1.0)
-                    rec  = np.where(val_true_sizes > 0, tp_per_sid / val_true_sizes, 1.0)
-                    # singleton: true=0, pred=0 -> 1.0; true=0, pred>0 -> 0.0
-                    is_singleton = val_true_sizes == 0
-                    singleton_f2 = np.where(pred_sizes[is_singleton] == 0, 1.0, 0.0)
-                    denom = prec + 4.0 * rec
-                    f2    = np.where(denom > 0, 5.0 * prec * rec / denom, 0.0)
-                    f2[is_singleton] = singleton_f2
-
-                score = float(np.mean(f2))
-                if score > best_score:
-                    best_score = score
-                    best_s2 = float(t2)
-                    best_s3 = float(t3)
-
-    # Final eval with winning thresholds using exact dedup
-    pre_sorted_pairs = [(p, sid, tid, tid.startswith('S2-'))
-                        for sid, score_list in scores_dict.items()
-                        for tid, p in score_list if p >= 0.15]
+                pre_sorted_pairs.append((p, sid, tid, tid.startswith('S2-')))
     pre_sorted_pairs.sort(key=lambda x: x[0], reverse=True)
+
+    best_score = -1.0
+    best_s2 = 0.50
+    best_s3 = 0.50
+
+    s2_grid = np.linspace(0.15, 0.90, 76)
+    s3_grid = np.linspace(0.15, 0.90, 76)
+    for t2 in s2_grid:
+        for t3 in s3_grid:
+            preds = apply_threshold_and_deduplication(scores_dict, t2, t3, pre_sorted_pairs=pre_sorted_pairs)
+            metrics = evaluate_predictions(val_gt, preds)
+            score = metrics.get(args.target_metric, metrics['macro_f1'])
+            if score > best_score:
+                best_score = score
+                best_s2 = float(t2)
+                best_s3 = float(t3)
 
     opt_preds = apply_threshold_and_deduplication(scores_dict, best_s2, best_s3, pre_sorted_pairs=pre_sorted_pairs)
     final_metrics = evaluate_predictions(val_gt, opt_preds)

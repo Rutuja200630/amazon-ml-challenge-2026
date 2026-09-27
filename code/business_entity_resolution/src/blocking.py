@@ -46,13 +46,10 @@ def get_blocking_keys_from_preprocessed(c_n, core_n, c_a, nums):
     elif len(n_tokens) == 1 and len(n_tokens[0]) >= 3:
         keys.add(('n1', n_tokens[0]))
 
-    # 4. Individual significant name tokens and sliding character 3-grams
+    # 4. Individual significant name tokens
     for t in n_tokens:
         if len(t) >= 3 and t not in norm.LEGAL_SUFFIXES and t not in norm.ARTICLES_AND_PREP:
             keys.add(('n_tok', t))
-            if len(t) >= 4:
-                for i in range(len(t) - 2):
-                    keys.add(('gram3_w', t[i:i+3]))
 
     # 4b. Prefix n-grams (3, 4, 5-gram) for core name
     if len(core_n) >= 3:
