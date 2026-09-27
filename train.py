@@ -22,8 +22,12 @@ from blocking import get_blocking_keys
 def auto_detect_train_dir():
     candidates = ['dataset/train', 'student_resource/dataset/train']
     for c in candidates:
-        if os.path.isdir(c):
+        if os.path.isfile(os.path.join(c, 'train_ground_truth.tsv')):
             return c
+    if os.path.isdir('/kaggle/input'):
+        for root, dirs, files in os.walk('/kaggle/input'):
+            if 'train_ground_truth.tsv' in files:
+                return root
     return candidates[0]
 
 

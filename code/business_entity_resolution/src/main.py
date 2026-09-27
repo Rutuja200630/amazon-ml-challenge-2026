@@ -12,8 +12,12 @@ from inference import run_test_inference
 def auto_detect_test_dir():
     candidates = ['dataset/test', 'student_resource/dataset/test']
     for c in candidates:
-        if os.path.isdir(c):
+        if os.path.isfile(os.path.join(c, 'test_source1.tsv')):
             return c
+    if os.path.isdir('/kaggle/input'):
+        for root, dirs, files in os.walk('/kaggle/input'):
+            if 'test_source1.tsv' in files:
+                return root
     return candidates[0]
 
 
