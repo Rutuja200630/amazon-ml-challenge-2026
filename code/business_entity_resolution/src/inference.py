@@ -14,7 +14,7 @@ from blocking import get_blocking_keys_from_preprocessed
 from thresholding import apply_threshold_and_deduplication
 
 
-def run_test_inference(test_dir, model_path, meta_path, output_dir, batch_size=10000, top_k=50):
+def run_test_inference(test_dir, model_path, meta_path, output_dir, batch_size=10000, top_k=100):
     """
     Runs end-to-end entity resolution inference on the complete test dataset.
     Uses disk-backed SQLite caching on D: drive to guarantee zero memory bloat (<500MB RAM),
@@ -137,7 +137,7 @@ def run_test_inference(test_dir, model_path, meta_path, output_dir, batch_size=1
         # Prune high-frequency keys to prevent generic word explosion
         pruned = 0
         for k in list(index.keys()):
-            limit = 400 if (k[0].startswith('n') or k[0].startswith('core') or k[0].startswith('compact')) else 200
+            limit = 1500 if (k[0].startswith('n') or k[0].startswith('core') or k[0].startswith('compact') or k[0].startswith('gram')) else 800
             if len(index[k]) > limit:
                 del index[k]
                 pruned += 1
@@ -202,7 +202,7 @@ def run_test_inference(test_dir, model_path, meta_path, output_dir, batch_size=1
                     if s1_nums and t_nums and len(set(s1_nums) & set(t_nums)) == 0:
                         exact_core = feats[1]
                         if exact_core < 1.0:
-                            prob *= 0.25
+                            prob *= 0.80
                     c_scores_dict[eid].append((tid, prob))
 
             if (b_idx + 1) % 10 == 0 or (b_idx + 1) == n_batches:

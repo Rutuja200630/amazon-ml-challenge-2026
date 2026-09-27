@@ -33,7 +33,7 @@ def main():
                         help='Directory where matching_results.tsv and candidate_pairs.tsv will be saved')
     parser.add_argument('--batch-size', type=int, default=10000,
                         help='Inference batch size')
-    parser.add_argument('--top-k', type=int, default=50,
+    parser.add_argument('--top-k', type=int, default=100,
                         help='Number of candidates per S1 entity')
     parser.add_argument('--validate', action='store_true', default=True,
                         help='Run validate_submission.py on generated outputs')

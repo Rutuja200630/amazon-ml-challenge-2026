@@ -21,6 +21,7 @@ class EntityMatcherModel:
                 'max_depth': 7,
                 'subsample': 0.85,
                 'colsample_bytree': 0.85,
+                'scale_pos_weight': 2.5,
                 'random_state': 42,
                 'eval_metric': 'logloss'
             }

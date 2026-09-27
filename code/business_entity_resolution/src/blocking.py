@@ -48,14 +48,28 @@ def get_blocking_keys_from_preprocessed(c_n, core_n, c_a, nums):
 
     # 4. Individual significant name tokens
     for t in n_tokens:
-        if len(t) >= 4 and t not in norm.LEGAL_SUFFIXES and t not in norm.ARTICLES_AND_PREP:
+        if len(t) >= 3 and t not in norm.LEGAL_SUFFIXES and t not in norm.ARTICLES_AND_PREP:
             keys.add(('n_tok', t))
 
-    # 4b. Prefix 5-gram for core name & initial token + 2nd token
+    # 4b. Prefix n-grams (3, 4, 5-gram) for core name
+    if len(core_n) >= 3:
+        keys.add(('gram3', core_n[:3]))
+    if len(core_n) >= 4:
+        keys.add(('gram4', core_n[:4]))
     if len(core_n) >= 5:
         keys.add(('gram5', core_n[:5]))
-    if len(n_tokens) >= 2 and len(n_tokens[0]) >= 1:
-        keys.add(('init_n2', f'{n_tokens[0][0]}_{n_tokens[1]}'))
+
+    # 4c. Consonant skeleton key (strips vowels to catch phonetic/spelling variations)
+    vowels = set('aeiouy')
+    cons_skel = ''.join([c for c in core_n if c.isalpha() and c not in vowels])
+    if len(cons_skel) >= 4:
+        keys.add(('cons_skel', cons_skel[:6]))
+
+    if len(n_tokens) >= 2:
+        if len(n_tokens[0]) >= 1:
+            keys.add(('init_n2', f'{n_tokens[0][0]}_{n_tokens[1]}'))
+        keys.add(('n_last', n_tokens[-1]))
+        keys.add(('init_last', f'{n_tokens[0][0]}_{n_tokens[-1]}'))
 
     # Address tokens: extract significant words
     sig_addr_words = [t for t in a_tokens if t not in COMMON_ADDR_WORDS and len(t) >= 3 and not t.isdigit()]

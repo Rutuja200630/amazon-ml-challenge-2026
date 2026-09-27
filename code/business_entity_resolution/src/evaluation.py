@@ -29,6 +29,34 @@ def compute_entity_f05(true_set, pred_set):
     return f05
 
 
+def compute_entity_f2(true_set, pred_set):
+    """
+    Computes F_2 score for a single Source 1 entity (prioritizing recall).
+    """
+    is_true_empty = len(true_set) == 0
+    is_pred_empty = len(pred_set) == 0
+
+    if is_true_empty:
+        return 1.0 if is_pred_empty else 0.0
+
+    if is_pred_empty:
+        return 0.0
+
+    tp = len(true_set & pred_set)
+    if tp == 0:
+        return 0.0
+
+    precision = tp / len(pred_set)
+    recall = tp / len(true_set)
+
+    denom = precision + 4.0 * recall
+    if denom == 0:
+        return 0.0
+
+    f2 = (5.0 * precision * recall) / denom
+    return f2
+
+
 def evaluate_predictions(ground_truth_dict, predictions_dict):
     """
     ground_truth_dict: {s1_id: set(target_ids)}
@@ -38,6 +66,7 @@ def evaluate_predictions(ground_truth_dict, predictions_dict):
     """
     f05_scores = []
     f1_scores = []
+    f2_scores = []
     total_tp = 0
     total_fp = 0
     total_fn = 0
@@ -57,7 +86,9 @@ def evaluate_predictions(ground_truth_dict, predictions_dict):
         pred_set = predictions_dict.get(s1_id, set())
 
         f05 = compute_entity_f05(true_set, pred_set)
+        f2 = compute_entity_f2(true_set, pred_set)
         f05_scores.append(f05)
+        f2_scores.append(f2)
 
         tp = len(true_set & pred_set)
         fp = len(pred_set - true_set)
@@ -87,12 +118,14 @@ def evaluate_predictions(ground_truth_dict, predictions_dict):
 
     macro_f05 = float(np.mean(f05_scores)) if f05_scores else 0.0
     macro_f1 = float(np.mean(f1_scores)) if f1_scores else 0.0
+    macro_f2 = float(np.mean(f2_scores)) if f2_scores else 0.0
     global_precision = total_tp / total_pred_links if total_pred_links > 0 else 1.0
     global_recall = total_tp / total_true_links if total_true_links > 0 else 0.0
 
     return {
         'macro_f05': macro_f05,
         'macro_f1': macro_f1,
+        'macro_f2': macro_f2,
         'global_precision': global_precision,
         'global_recall': global_recall,
         'total_tp': total_tp,

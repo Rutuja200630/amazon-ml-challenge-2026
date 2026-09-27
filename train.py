@@ -41,8 +41,10 @@ def main():
                         help='Number of validation Source 1 entities to evaluate')
     parser.add_argument('--n-train', type=int, default=150000,
                         help='Number of training Source 1 entities to sample')
-    parser.add_argument('--top-k', type=int, default=50,
+    parser.add_argument('--top-k', type=int, default=100,
                         help='Number of candidates per S1 entity')
+    parser.add_argument('--target-metric', default='macro_f2', choices=['macro_f2', 'macro_f1', 'macro_f05'],
+                        help='Metric to optimize thresholding grid search for')
     parser.add_argument('--seed', type=int, default=42,
                         help='Random seed for reproducible training sampling')
     parser.add_argument('--n-distractors', type=int, default=300000,
@@ -190,11 +192,11 @@ def main():
 
     for c in indices:
         for k in list(indices[c].keys()):
-            limit = 500 if (k[0].startswith('n') or k[0].startswith('core') or k[0].startswith('compact')) else 250
+            limit = 1500 if (k[0].startswith('n') or k[0].startswith('core') or k[0].startswith('compact') or k[0].startswith('gram')) else 800
             if len(indices[c][k]) > limit:
                 del indices[c][k]
 
-    def get_candidates(sid, top_k=50):
+    def get_candidates(sid, top_k=100):
         s_keys = s1_blocking_keys[sid]
         country = s1_preprocessed[sid][5]
         c_index = indices[country]
@@ -286,13 +288,13 @@ def main():
     scores_dict = collections.defaultdict(list)
     for (sid, tid, feats, s1_tup, t_tup), p in zip(val_pair_list, val_probas):
         prob = float(p)
-        # Apply set-based street number conflict penalty
+        # Apply set-based street number conflict penalty (softened for higher recall)
         s1_nums = s1_tup[3]
         t_nums = t_tup[3]
         if s1_nums and t_nums and len(set(s1_nums) & set(t_nums)) == 0:
             exact_core = feats[1]
             if exact_core < 1.0:
-                prob *= 0.25
+                prob *= 0.80
         scores_dict[sid].append((tid, prob))
 
     for sid in val_s1_ids:
@@ -300,20 +302,21 @@ def main():
             scores_dict[sid] = []
 
     # Grid search optimal thresholds with bipartite 1-to-1 consistency
-    print('Optimizing source-specific thresholds with 1-to-1 deduplication...')
-    best_f05 = -1.0
-    best_s2 = 0.80
-    best_s3 = 0.88
+    print(f'Optimizing source-specific thresholds for target metric: {args.target_metric} with 1-to-1 deduplication...')
+    best_score = -1.0
+    best_s2 = 0.50
+    best_s3 = 0.50
     best_metrics = None
 
-    s2_grid = np.linspace(0.40, 0.85, 46)
-    s3_grid = np.linspace(0.40, 0.85, 46)
+    s2_grid = np.linspace(0.25, 0.85, 61)
+    s3_grid = np.linspace(0.25, 0.85, 61)
     for t2 in s2_grid:
         for t3 in s3_grid:
             preds = apply_threshold_and_deduplication(scores_dict, t2, t3)
             metrics = evaluate_predictions(val_gt, preds)
-            if metrics['macro_f05'] > best_f05:
-                best_f05 = metrics['macro_f05']
+            score = metrics.get(args.target_metric, metrics['macro_f1'])
+            if score > best_score:
+                best_score = score
                 best_s2 = float(t2)
                 best_s3 = float(t3)
                 best_metrics = metrics
@@ -326,10 +329,11 @@ def main():
     print('FINAL MODEL VALIDATION BENCHMARKS')
     print('=' * 60)
     print(f"Optimal Thresholds: S2 = {best_s2:.2f}, S3 = {best_s3:.2f}")
+    print(f"Validation Macro F2   : {final_metrics['macro_f2']:.6f}")
+    print(f"Validation Macro F1   : {final_metrics['macro_f1']:.6f}")
     print(f"Validation Macro F0.5 : {final_metrics['macro_f05']:.6f}")
     print(f"Validation Precision  : {final_metrics['global_precision']:.6f}")
     print(f"Validation Recall     : {final_metrics['global_recall']:.6f}")
-    print(f"Validation Macro F1   : {final_metrics['macro_f1']:.6f}")
     print(f"Candidate Recall      : {val_cand_recall:.6f}")
     print(f"False Positives       : {final_metrics['total_fp']}")
     print(f"False Negatives       : {final_metrics['total_fn']}")
