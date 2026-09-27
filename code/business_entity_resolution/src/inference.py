@@ -197,9 +197,8 @@ def run_test_inference(test_dir, model_path, meta_path, output_dir, batch_size=1
                 for (eid, tid, feats, s1_tup, t_tup), p in zip(batch_pairs, probas):
                     c_scores_dict[eid].append((tid, float(p)))
 
-            if (b_idx + 1) % 2 == 0 or (b_idx + 1) == n_batches:
-                print(f'    Processed batch {b_idx + 1}/{n_batches} ({b_end:,}/{len(s1_list):,} records)...')
-                sys.stdout.flush()
+            print(f'    Processed batch {b_idx + 1}/{n_batches} ({b_end:,}/{len(s1_list):,} records)...')
+            sys.stdout.flush()
 
         conn.commit()
 
