@@ -41,7 +41,7 @@ def main():
                         help='Number of validation Source 1 entities to evaluate')
     parser.add_argument('--n-train', type=int, default=150000,
                         help='Number of training Source 1 entities to sample')
-    parser.add_argument('--top-k', type=int, default=100,
+    parser.add_argument('--top-k', type=int, default=200,
                         help='Number of candidates per S1 entity')
     parser.add_argument('--target-metric', default='macro_f2', choices=['macro_f2', 'macro_f1', 'macro_f05'],
                         help='Metric to optimize thresholding grid search for')
@@ -51,7 +51,7 @@ def main():
                         help='Number of realistic background distractors to load from target sources')
     parser.add_argument('--model-type', default='xgboost_gpu', choices=['xgboost_gpu', 'xgboost', 'lightgbm'],
                         help='Model architecture to train (xgboost_gpu uses NVIDIA CUDA GPU)')
-    parser.add_argument('--n-estimators', type=int, default=500,
+    parser.add_argument('--n-estimators', type=int, default=800,
                         help='Number of gradient boosted trees')
     parser.add_argument('--model-out', default='models/final_entity_matcher.joblib',
                         help='Output path for trained model')
@@ -192,11 +192,11 @@ def main():
 
     for c in indices:
         for k in list(indices[c].keys()):
-            limit = 1500 if (k[0].startswith('n') or k[0].startswith('core') or k[0].startswith('compact') or k[0].startswith('gram')) else 800
+            limit = 4000 if (k[0].startswith('n') or k[0].startswith('core') or k[0].startswith('compact') or k[0].startswith('gram') or k[0].startswith('snd')) else 1800
             if len(indices[c][k]) > limit:
                 del indices[c][k]
 
-    def get_candidates(sid, top_k=100):
+    def get_candidates(sid, top_k=200):
         s_keys = s1_blocking_keys[sid]
         country = s1_preprocessed[sid][5]
         c_index = indices[country]
@@ -233,7 +233,7 @@ def main():
         # Candidates that share keys with S1 but are NOT true matches
         # cands is ordered by shared key count (sh) descending (most similar hard negatives first)
         neg_count = 0
-        max_negs = max(6, len(true_mids) * 6)
+        max_negs = max(10, len(true_mids) * 10)
         for tid, sh in cands:
             if tid not in true_mids and tid in target_preprocessed:
                 t_tup = target_preprocessed[tid][:5]
@@ -256,8 +256,8 @@ def main():
     final_model = EntityMatcherModel(
         args.model_type,
         n_estimators=args.n_estimators,
-        learning_rate=0.035,
-        max_depth=7,
+        learning_rate=0.03,
+        max_depth=8,
         subsample=0.85,
         colsample_bytree=0.85
     )

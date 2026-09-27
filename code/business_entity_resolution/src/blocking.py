@@ -46,10 +46,13 @@ def get_blocking_keys_from_preprocessed(c_n, core_n, c_a, nums):
     elif len(n_tokens) == 1 and len(n_tokens[0]) >= 3:
         keys.add(('n1', n_tokens[0]))
 
-    # 4. Individual significant name tokens
+    # 4. Individual significant name tokens and sliding character 3-grams
     for t in n_tokens:
         if len(t) >= 3 and t not in norm.LEGAL_SUFFIXES and t not in norm.ARTICLES_AND_PREP:
             keys.add(('n_tok', t))
+            if len(t) >= 4:
+                for i in range(len(t) - 2):
+                    keys.add(('gram3_w', t[i:i+3]))
 
     # 4b. Prefix n-grams (3, 4, 5-gram) for core name
     if len(core_n) >= 3:
@@ -59,11 +62,18 @@ def get_blocking_keys_from_preprocessed(c_n, core_n, c_a, nums):
     if len(core_n) >= 5:
         keys.add(('gram5', core_n[:5]))
 
-    # 4c. Consonant skeleton key (strips vowels to catch phonetic/spelling variations)
+    # 4c. Consonant skeleton & Soundex key (strips vowels to catch phonetic/spelling variations)
     vowels = set('aeiouy')
     cons_skel = ''.join([c for c in core_n if c.isalpha() and c not in vowels])
     if len(cons_skel) >= 4:
         keys.add(('cons_skel', cons_skel[:6]))
+
+    if n_tokens:
+        t0 = n_tokens[0]
+        if len(t0) >= 3:
+            snd = t0[0] + ''.join([c for c in t0[1:] if c.isalpha() and c not in 'aeiouy'])
+            if len(snd) >= 3:
+                keys.add(('snd', snd[:4]))
 
     if len(n_tokens) >= 2:
         if len(n_tokens[0]) >= 1:
