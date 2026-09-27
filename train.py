@@ -213,27 +213,26 @@ def main():
         return []
 
     # 5. Build Training Feature Matrix with Active Hard Negative Mining
-    print(f'Extracting features for training pairs using multi-core CPU ({os.cpu_count() or 4} workers)...')
+    print('Extracting features for training pairs (including hard negatives)...')
     t_feat_start = time.time()
     train_target_set = set(target_preprocessed.keys())
 
-    import concurrent.futures
+    X_train_list = []
+    y_train_list = []
 
-    def process_s1_train_entity(sid):
+    for sid_idx, sid in enumerate(train_s1_ids):
         true_mids = train_gt.get(sid, set()) & train_target_set
         cands = get_candidates(sid, top_k=args.top_k)
         cand_mids = {tid: count for tid, count in cands}
         s1_tup = s1_preprocessed[sid][:5]
-        local_X = []
-        local_y = []
 
         for mid in true_mids:
             if mid in target_preprocessed:
                 t_tup = target_preprocessed[mid][:5]
                 sh = cand_mids.get(mid, 1)
                 feats = extract_features_for_pair(s1_tup, t_tup, mid, sh)
-                local_X.append(feats)
-                local_y.append(1)
+                X_train_list.append(feats)
+                y_train_list.append(1)
 
         neg_count = 0
         max_negs = max(10, len(true_mids) * 10)
@@ -241,23 +240,11 @@ def main():
             if tid not in true_mids and tid in target_preprocessed:
                 t_tup = target_preprocessed[tid][:5]
                 feats = extract_features_for_pair(s1_tup, t_tup, tid, sh)
-                local_X.append(feats)
-                local_y.append(0)
+                X_train_list.append(feats)
+                y_train_list.append(0)
                 neg_count += 1
                 if neg_count >= max_negs:
                     break
-        return local_X, local_y
-
-    num_workers = min(16, max(2, (os.cpu_count() or 4)))
-    X_train_list = []
-    y_train_list = []
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
-        futures = executor.map(process_s1_train_entity, train_s1_ids, chunksize=500)
-        for res_X, res_y in futures:
-            if res_X:
-                X_train_list.extend(res_X)
-                y_train_list.extend(res_y)
 
     X_train = np.array(X_train_list, dtype=np.float32)
     y_train = np.array(y_train_list, dtype=np.int32)
@@ -285,26 +272,17 @@ def main():
     retrieved_val_true = 0
     total_val_true = sum(len(v) for v in val_gt.values())
 
-    def process_s1_val_entity(sid):
+    for sid in val_s1_ids:
         cands = get_candidates(sid, top_k=args.top_k)
         cand_ids = [tid for tid, _ in cands]
-        retrieved_count = len(val_gt[sid] & set(cand_ids))
+        retrieved_val_true += len(val_gt[sid] & set(cand_ids))
 
-        local_pairs = []
         s1_tup = s1_preprocessed[sid][:5]
         for tid, sh in cands:
             if tid in target_preprocessed:
                 t_tup = target_preprocessed[tid][:5]
                 feats = extract_features_for_pair(s1_tup, t_tup, tid, sh)
-                local_pairs.append((sid, tid, feats, s1_tup, t_tup))
-        return retrieved_count, local_pairs
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
-        val_results = executor.map(process_s1_val_entity, val_s1_ids, chunksize=200)
-        for r_count, l_pairs in val_results:
-            retrieved_val_true += r_count
-            if l_pairs:
-                val_pair_list.extend(l_pairs)
+                val_pair_list.append((sid, tid, feats, s1_tup, t_tup))
 
     X_val = np.array([p[2] for p in val_pair_list], dtype=np.float32)
     val_probas = final_model.predict_proba(X_val)
