@@ -196,14 +196,18 @@ def main():
             if len(indices[c][k]) > limit:
                 del indices[c][k]
 
+    # Convert inverted index to standard read-only dicts to guarantee thread-safety without dict mutation deadlocks
+    clean_indices = {c: dict(indices[c]) for c in indices}
+
     def get_candidates(sid, top_k=200):
         s_keys = s1_blocking_keys[sid]
         country = s1_preprocessed[sid][5]
-        c_index = indices[country]
+        c_index = clean_indices.get(country, {})
         counts = collections.Counter()
         for k in s_keys:
-            if k in c_index:
-                counts.update(c_index[k])
+            tids = c_index.get(k)
+            if tids:
+                counts.update(tids)
         if counts:
             return counts.most_common(top_k)
         return []
