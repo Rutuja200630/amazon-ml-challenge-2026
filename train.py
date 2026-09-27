@@ -83,6 +83,16 @@ def main():
                     val_s1_ids.append(sid)
                 if len(val_s1_ids) >= args.n_val:
                     break
+    else:
+        print(f"Validation file {args.val_ids} not found. Auto-generating validation split...")
+        with open(gt_file, 'r', encoding='utf-8') as f:
+            f.readline()
+            for line in f:
+                sid = line.split('\t')[0]
+                val_s1_ids.append(sid)
+                if len(val_s1_ids) >= args.n_val:
+                    break
+    
     val_s1_set = set(val_s1_ids)
     print(f'Loaded {len(val_s1_set):,} validation entities.')
 
