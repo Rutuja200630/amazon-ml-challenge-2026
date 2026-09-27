@@ -310,10 +310,20 @@ def main():
     best_s2 = 0.50
     best_s3 = 0.50
 
-    s2_grid = np.linspace(0.15, 0.90, 76)
-    s3_grid = np.linspace(0.15, 0.90, 76)
-    for t2 in s2_grid:
-        for t3 in s3_grid:
+    # Coarse pass: 31x31 = 961 combos (fast)
+    for t2 in np.linspace(0.15, 0.90, 31):
+        for t3 in np.linspace(0.15, 0.90, 31):
+            preds = apply_threshold_and_deduplication(scores_dict, t2, t3, pre_sorted_pairs=pre_sorted_pairs)
+            metrics = evaluate_predictions(val_gt, preds)
+            score = metrics.get(args.target_metric, metrics['macro_f1'])
+            if score > best_score:
+                best_score = score
+                best_s2 = float(t2)
+                best_s3 = float(t3)
+
+    # Fine pass: 21x21 = 441 combos around best point (±0.10 window)
+    for t2 in np.linspace(max(0.10, best_s2 - 0.10), min(0.95, best_s2 + 0.10), 21):
+        for t3 in np.linspace(max(0.10, best_s3 - 0.10), min(0.95, best_s3 + 0.10), 21):
             preds = apply_threshold_and_deduplication(scores_dict, t2, t3, pre_sorted_pairs=pre_sorted_pairs)
             metrics = evaluate_predictions(val_gt, preds)
             score = metrics.get(args.target_metric, metrics['macro_f1'])
