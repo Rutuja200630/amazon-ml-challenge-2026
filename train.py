@@ -186,7 +186,7 @@ def main():
 
     for c in indices:
         for k in list(indices[c].keys()):
-            limit = 350 if (k[0].startswith('n') or k[0].startswith('core') or k[0].startswith('compact')) else 150
+            limit = 500 if (k[0].startswith('n') or k[0].startswith('core') or k[0].startswith('compact')) else 250
             if len(indices[c][k]) > limit:
                 del indices[c][k]
 
@@ -282,13 +282,13 @@ def main():
     scores_dict = collections.defaultdict(list)
     for (sid, tid, feats, s1_tup, t_tup), p in zip(val_pair_list, val_probas):
         prob = float(p)
-        # Apply primary street number conflict penalty
-        s1_pnum = s1_tup[4]
-        t_pnum = t_tup[4]
-        if s1_pnum is not None and t_pnum is not None and s1_pnum != t_pnum:
+        # Apply set-based street number conflict penalty
+        s1_nums = s1_tup[3]
+        t_nums = t_tup[3]
+        if s1_nums and t_nums and len(set(s1_nums) & set(t_nums)) == 0:
             exact_core = feats[1]
             if exact_core < 1.0:
-                prob *= 0.1
+                prob *= 0.25
         scores_dict[sid].append((tid, prob))
 
     for sid in val_s1_ids:
@@ -302,14 +302,16 @@ def main():
     best_s3 = 0.88
     best_metrics = None
 
-    for t2 in [0.70, 0.75, 0.80, 0.85]:
-        for t3 in [0.75, 0.80, 0.85, 0.90]:
+    s2_grid = np.linspace(0.40, 0.85, 46)
+    s3_grid = np.linspace(0.40, 0.85, 46)
+    for t2 in s2_grid:
+        for t3 in s3_grid:
             preds = apply_threshold_and_deduplication(scores_dict, t2, t3)
             metrics = evaluate_predictions(val_gt, preds)
             if metrics['macro_f05'] > best_f05:
                 best_f05 = metrics['macro_f05']
-                best_s2 = t2
-                best_s3 = t3
+                best_s2 = float(t2)
+                best_s3 = float(t3)
                 best_metrics = metrics
 
     opt_preds = apply_threshold_and_deduplication(scores_dict, best_s2, best_s3)

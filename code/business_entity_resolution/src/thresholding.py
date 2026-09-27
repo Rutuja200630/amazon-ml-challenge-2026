@@ -35,9 +35,9 @@ def optimize_source_specific_thresholds(ground_truth_dict, candidate_scores_dict
     Finds separate thresholds for S2 and S3 candidates.
     """
     if s2_grid is None:
-        s2_grid = np.linspace(0.40, 0.85, 10)
+        s2_grid = np.linspace(0.40, 0.85, 46)
     if s3_grid is None:
-        s3_grid = np.linspace(0.40, 0.85, 10)
+        s3_grid = np.linspace(0.40, 0.85, 46)
 
     best_s2 = 0.5
     best_s3 = 0.5

@@ -51,6 +51,12 @@ def get_blocking_keys_from_preprocessed(c_n, core_n, c_a, nums):
         if len(t) >= 4 and t not in norm.LEGAL_SUFFIXES and t not in norm.ARTICLES_AND_PREP:
             keys.add(('n_tok', t))
 
+    # 4b. Prefix 5-gram for core name & initial token + 2nd token
+    if len(core_n) >= 5:
+        keys.add(('gram5', core_n[:5]))
+    if len(n_tokens) >= 2 and len(n_tokens[0]) >= 1:
+        keys.add(('init_n2', f'{n_tokens[0][0]}_{n_tokens[1]}'))
+
     # Address tokens: extract significant words
     sig_addr_words = [t for t in a_tokens if t not in COMMON_ADDR_WORDS and len(t) >= 3 and not t.isdigit()]
 
@@ -80,6 +86,10 @@ def get_blocking_keys_from_preprocessed(c_n, core_n, c_a, nums):
         keys.add(('name_city', f'{n_tokens[0]}_{a_tokens[-1]}'))
         if len(a_tokens) >= 2:
             keys.add(('name_city2', f'{n_tokens[0]}_{a_tokens[-2]}'))
+
+    # 8b. Significant Name Token + Significant Address Word
+    if n_tokens and sig_addr_words:
+        keys.add(('name_addr', f'{n_tokens[0]}_{sig_addr_words[0]}'))
 
     # 9. Pairs of rare address words
     if len(sig_addr_words) >= 2:

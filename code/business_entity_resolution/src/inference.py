@@ -137,7 +137,7 @@ def run_test_inference(test_dir, model_path, meta_path, output_dir, batch_size=1
         # Prune high-frequency keys to prevent generic word explosion
         pruned = 0
         for k in list(index.keys()):
-            limit = 250 if (k[0].startswith('n') or k[0].startswith('core') or k[0].startswith('compact')) else 100
+            limit = 400 if (k[0].startswith('n') or k[0].startswith('core') or k[0].startswith('compact')) else 200
             if len(index[k]) > limit:
                 del index[k]
                 pruned += 1
@@ -196,14 +196,13 @@ def run_test_inference(test_dir, model_path, meta_path, output_dir, batch_size=1
                 probas = model.predict_proba(X_batch)
                 for (eid, tid, feats, s1_tup, t_tup), p in zip(batch_pairs, probas):
                     prob = float(p)
-                    # Strict street number conflict check:
-                    # If both records have primary street numbers and they conflict:
-                    s1_pnum = s1_tup[4]
-                    t_pnum = t_tup[4]
-                    if s1_pnum is not None and t_pnum is not None and s1_pnum != t_pnum:
+                    # Set-based street number conflict check:
+                    s1_nums = s1_tup[3]
+                    t_nums = t_tup[3]
+                    if s1_nums and t_nums and len(set(s1_nums) & set(t_nums)) == 0:
                         exact_core = feats[1]
                         if exact_core < 1.0:
-                            prob *= 0.1  # Drastic penalty for look-alikes on same street with different numbers
+                            prob *= 0.25
                     c_scores_dict[eid].append((tid, prob))
 
             if (b_idx + 1) % 10 == 0 or (b_idx + 1) == n_batches:
