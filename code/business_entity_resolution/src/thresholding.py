@@ -66,18 +66,35 @@ def optimize_source_specific_thresholds(ground_truth_dict, candidate_scores_dict
     return best_s2, best_s3, best_metrics
 
 
-def apply_threshold_and_deduplication(candidate_scores_dict, s2_threshold=0.5, s3_threshold=0.5):
+def apply_threshold_and_deduplication(candidate_scores_dict, s2_threshold=0.5, s3_threshold=0.5, pre_sorted_pairs=None):
     """
     Applies thresholds and enforces that each target (S2/S3) is assigned to at most one S1
     (the S1 with the highest probability score).
+    If pre_sorted_pairs is provided, avoids redundant iteration and sorting.
     """
+    if pre_sorted_pairs is not None:
+        assigned_targets = set()
+        result = {s1_id: set() for s1_id in candidate_scores_dict.keys()}
+        min_t = s2_threshold if s2_threshold < s3_threshold else s3_threshold
+        for p, s1_id, tid, is_s2 in pre_sorted_pairs:
+            if p < min_t:
+                break
+            t = s2_threshold if is_s2 else s3_threshold
+            if p >= t:
+                if tid not in assigned_targets:
+                    assigned_targets.add(tid)
+                    result[s1_id].add(tid)
+        return result
+
     # First gather all (s1_id, target_id, proba) above threshold
     all_pairs = []
+    min_t = min(s2_threshold, s3_threshold)
     for s1_id, scores in candidate_scores_dict.items():
         for tid, p in scores:
-            t = s2_threshold if tid.startswith('S2-') else s3_threshold
-            if p >= t:
-                all_pairs.append((p, s1_id, tid))
+            if p >= min_t:
+                t = s2_threshold if tid.startswith('S2-') else s3_threshold
+                if p >= t:
+                    all_pairs.append((p, s1_id, tid))
 
     # Sort descending by score
     all_pairs.sort(key=lambda x: x[0], reverse=True)

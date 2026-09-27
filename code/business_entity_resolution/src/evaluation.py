@@ -79,10 +79,7 @@ def evaluate_predictions(ground_truth_dict, predictions_dict):
 
     non_singleton_count = 0
 
-    all_s1_ids = sorted(list(ground_truth_dict.keys()))
-
-    for s1_id in all_s1_ids:
-        true_set = ground_truth_dict[s1_id]
+    for s1_id, true_set in ground_truth_dict.items():
         pred_set = predictions_dict.get(s1_id, set())
 
         f05 = compute_entity_f05(true_set, pred_set)

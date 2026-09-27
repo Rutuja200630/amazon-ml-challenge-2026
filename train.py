@@ -308,11 +308,19 @@ def main():
     best_s3 = 0.50
     best_metrics = None
 
+    # Pre-sort pairs with proba >= 0.20 once to make grid search 100x faster
+    pre_sorted_pairs = []
+    for sid, scores in scores_dict.items():
+        for tid, p in scores:
+            if p >= 0.20:
+                pre_sorted_pairs.append((p, sid, tid, tid.startswith('S2-')))
+    pre_sorted_pairs.sort(key=lambda x: x[0], reverse=True)
+
     s2_grid = np.linspace(0.25, 0.85, 61)
     s3_grid = np.linspace(0.25, 0.85, 61)
     for t2 in s2_grid:
         for t3 in s3_grid:
-            preds = apply_threshold_and_deduplication(scores_dict, t2, t3)
+            preds = apply_threshold_and_deduplication(scores_dict, t2, t3, pre_sorted_pairs=pre_sorted_pairs)
             metrics = evaluate_predictions(val_gt, preds)
             score = metrics.get(args.target_metric, metrics['macro_f1'])
             if score > best_score:
@@ -321,7 +329,7 @@ def main():
                 best_s3 = float(t3)
                 best_metrics = metrics
 
-    opt_preds = apply_threshold_and_deduplication(scores_dict, best_s2, best_s3)
+    opt_preds = apply_threshold_and_deduplication(scores_dict, best_s2, best_s3, pre_sorted_pairs=pre_sorted_pairs)
     final_metrics = evaluate_predictions(val_gt, opt_preds)
     val_cand_recall = retrieved_val_true / total_val_true if total_val_true > 0 else 0.0
 
