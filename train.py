@@ -192,7 +192,7 @@ def main():
 
     for c in indices:
         for k in list(indices[c].keys()):
-            limit = 4000 if (k[0].startswith('n') or k[0].startswith('core') or k[0].startswith('compact') or k[0].startswith('gram') or k[0].startswith('snd')) else 1800
+            limit = 35000 if (k[0].startswith('n') or k[0].startswith('core') or k[0].startswith('compact') or k[0].startswith('gram') or k[0].startswith('snd')) else 15000
             if len(indices[c][k]) > limit:
                 del indices[c][k]
 
@@ -235,7 +235,7 @@ def main():
                 y_train_list.append(1)
 
         neg_count = 0
-        max_negs = max(6, len(true_mids) * 6)
+        max_negs = max(3, len(true_mids) * 3)
         for tid, sh in cands:
             if tid not in true_mids and tid in target_preprocessed:
                 t_tup = target_preprocessed[tid][:5]

@@ -114,6 +114,14 @@ def get_blocking_keys_from_preprocessed(c_n, core_n, c_a, nums):
     if n_tokens and sig_addr_words:
         keys.add(('name_addr', f'{n_tokens[0]}_{sig_addr_words[0]}'))
 
+    # 8c. Soundex of First Name + First Significant Address Word (Typo Tolerant)
+    if n_tokens and sig_addr_words:
+        t0 = n_tokens[0]
+        if len(t0) >= 3:
+            snd = t0[0] + ''.join([c for c in t0[1:] if c.isalpha() and c not in 'aeiouy'])
+            if len(snd) >= 3:
+                keys.add(('snd_addr', f'{snd[:4]}_{sig_addr_words[0]}'))
+
     # 9. Pairs of rare address words
     if len(sig_addr_words) >= 2:
         for i in range(min(len(sig_addr_words), 4)):
