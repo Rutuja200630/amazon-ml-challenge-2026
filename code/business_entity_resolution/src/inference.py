@@ -137,7 +137,7 @@ def run_test_inference(test_dir, model_path, meta_path, output_dir, batch_size=1
         # Prune high-frequency keys to prevent generic word explosion
         pruned = 0
         for k in list(index.keys()):
-            limit = 4000 if (k[0].startswith('n') or k[0].startswith('core') or k[0].startswith('compact') or k[0].startswith('gram') or k[0].startswith('snd')) else 1800
+            limit = 35000 if (k[0].startswith('n') or k[0].startswith('core') or k[0].startswith('compact') or k[0].startswith('gram') or k[0].startswith('snd')) else 15000
             if len(index[k]) > limit:
                 del index[k]
                 pruned += 1
