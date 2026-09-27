@@ -49,7 +49,7 @@ def compute_entity_f2(true_set, pred_set):
     precision = tp / len(pred_set)
     recall = tp / len(true_set)
 
-    denom = precision + 4.0 * recall
+    denom = 4.0 * precision + recall
     if denom == 0:
         return 0.0
 
